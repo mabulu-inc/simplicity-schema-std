@@ -10,8 +10,9 @@ live here and are parameterized — each consuming app supplies its own identity
 table and actor GUC, so the package carries no dependency on any app's data
 model (including `@smplcty/auth`, which consumes this like any other app).
 
-> **Status: implemented, unpublished (`0.0.0`).** Requires schema-flow ≥ 0.11.0
-> (`imports` + parameterized mixins). Not yet on npm.
+📖 **Documentation:** **[mabulu-inc.github.io/simplicity-schema-std](https://mabulu-inc.github.io/simplicity-schema-std/)**
+
+> Requires schema-flow ≥ 0.11.0 (`imports` + parameterized mixins).
 
 ## Contents
 
@@ -99,13 +100,34 @@ and behavior (stamping, diff history, no-op skip, soft-delete markers).
 ## Releasing
 
 Same tooling as `@smplcty/schema-flow`: `release-it` with the keep-a-changelog
-plugin cuts the tag + GitHub release from `main`; the `publish.yml` workflow
-publishes to npm with provenance and refuses any tag not reachable from `main`.
+plugin cuts the tag + GitHub release from `main`; on that release the
+`publish.yml` workflow publishes to npm with provenance and `deploy-docs.yml`
+rebuilds and deploys the docs site — both refuse any tag not reachable from
+`main`.
 
 ```
 pnpm release        # derives the bump from CHANGELOG, or:
 pnpm release:patch | release:minor | release:major
 ```
+
+## Documentation
+
+Full documentation at
+**[mabulu-inc.github.io/simplicity-schema-std](https://mabulu-inc.github.io/simplicity-schema-std/)**:
+
+- **[Getting started](https://mabulu-inc.github.io/simplicity-schema-std/getting-started/introduction/)**
+  — import, add mixins, set the actor, parameters
+- **[Mixins](https://mabulu-inc.github.io/simplicity-schema-std/mixins/audit/)**
+  — `audit`, `timestamps`, `soft_delete`, `audit_log`, `audit_log_actor`
+- **[Functions](https://mabulu-inc.github.io/simplicity-schema-std/functions/audit-stamp/)**
+  — the stamp / diff / no-op-skip triggers and `audit_backfill_by`
+- **[audit_log table](https://mabulu-inc.github.io/simplicity-schema-std/tables/audit-log/)**
+  — columns, indexes, the `__row__` sentinel, append-only grants
+- **[Bootstrap & seeding](https://mabulu-inc.github.io/simplicity-schema-std/guides/bootstrap-seeding/)**
+  — seeding audit tables without tripping the `NOT NULL` `_by` columns
+
+The site is built from `docs-site/` (Astro + Starlight) and deployed to GitHub
+Pages on every release.
 
 ## License
 
