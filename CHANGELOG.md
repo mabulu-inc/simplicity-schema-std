@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.1] - 2026-06-10
+
 ### Added
 
 - **Standard schema building blocks.** Parameterized mixins — `audit`
@@ -26,3 +28,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **End-to-end test suite.** Applies the real shipped schema through
   schema-flow `imports` + `params` against a throwaway Postgres (docker
   compose), asserting both structure and audit/timestamp/soft-delete behavior.
+
+[Unreleased]: https://github.com/mabulu-inc/simplicity-schema-std/compare/v0.0.1...HEAD
+[0.0.1]: https://github.com/mabulu-inc/simplicity-schema-std/releases/tag/v0.0.1
