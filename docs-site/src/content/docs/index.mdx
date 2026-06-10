@@ -1,0 +1,36 @@
+---
+title: schema-std
+description: Standard, parameterized PostgreSQL schema building blocks — audit, soft-delete, timestamps, and an audit-log trail — consumed by reference via @smplcty/schema-flow imports.
+template: splash
+hero:
+  tagline: The cross-cutting patterns every app re-implements — audit columns, soft delete, timestamps, a field-level audit log — packaged once, parameterized, and imported by reference. No copy-paste. No domain coupling.
+  actions:
+    - text: Get started
+      link: /simplicity-schema-std/getting-started/introduction/
+      icon: right-arrow
+    - text: Mixins reference
+      link: /simplicity-schema-std/mixins/audit/
+      icon: open-book
+      variant: minimal
+    - text: GitHub
+      link: https://github.com/mabulu-inc/simplicity-schema-std
+      icon: external
+      variant: minimal
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+<CardGrid>
+  <Card title="Imported, not copied" icon="seti:db">
+    Consumed by reference via schema-flow `imports`. Upgrade the package, every app gets the fix — no copy-pasted SQL to chase down.
+  </Card>
+  <Card title="Parameterized" icon="setting">
+    Each app supplies its own identity table and actor GUC. The package carries no dependency on any app's data model.
+  </Card>
+  <Card title="Audit built in" icon="approve-check">
+    Stamp columns, no-op skip, and a field-level `audit_log` trail — created/archived/restored/hard-deleted, one row per changed column.
+  </Card>
+  <Card title="Composable" icon="puzzle">
+    `audit`, `timestamps`, `soft_delete`, `audit_log` — mix the ones a table needs. Trigger ordering is handled for you.
+  </Card>
+</CardGrid>
