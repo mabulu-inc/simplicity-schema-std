@@ -173,4 +173,38 @@ columns:
       expect(archived.rowCount).toBe(1);
     });
   });
+
+  it('(5) audit_backfill_by fills NULL _by left by actor-less bootstrap seeds', async () => {
+    ctx = await useTestProject(DATABASE_URL);
+    writeSchema(ctx.dir, { 'tables/users.yaml': usersTable, 'tables/docs.yaml': docsTable });
+
+    await apply(ctx);
+
+    await inSchema(ctx, async (q) => {
+      // Clear any actor leaked onto this pooled connection by an earlier test.
+      await q(`RESET app.actor_id`);
+
+      // Reproduce the pre-tighten bootstrap window: *_by columns still
+      // nullable, and a row seeded with no actor set (audit_stamp writes NULL).
+      await q(`ALTER TABLE docs ALTER COLUMN created_by DROP NOT NULL`);
+      await q(`ALTER TABLE docs ALTER COLUMN updated_by DROP NOT NULL`);
+      await q(`INSERT INTO users (user_id) VALUES (1)`);
+      await q(`INSERT INTO docs (id, title) VALUES (1, 'seeded')`);
+
+      const before = await q(`SELECT created_by, updated_by FROM docs WHERE id = 1`);
+      expect(before.rows[0].created_by).toBeNull();
+      expect(before.rows[0].updated_by).toBeNull();
+
+      // Backfill to the fallback actor; returns the number of rows fixed.
+      const fixed = await q(`SELECT audit_backfill_by(1) AS n`);
+      expect(fixed.rows[0].n).toBe(1);
+
+      const after = await q(`SELECT created_by, updated_by FROM docs WHERE id = 1`);
+      expect(after.rows[0].created_by).toBe('1');
+      expect(after.rows[0].updated_by).toBe('1');
+
+      // tighten can now re-enforce NOT NULL without VALIDATE failing
+      await expect(q(`ALTER TABLE docs ALTER COLUMN created_by SET NOT NULL`)).resolves.toBeDefined();
+    });
+  });
 });

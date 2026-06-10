@@ -18,6 +18,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `imports` params (`user_table` / `user_pk` / `actor_guc`, defaulting to
   `users` / `user_id` / `app.actor_id`), so the package depends on no app's
   data model.
+- **Bootstrap back-fill helper.** `audit_backfill_by(p_actor)` fills NULL
+  `created_by` / `updated_by` left by actor-less seeds (so the post-seed
+  `NOT NULL` tighten passes), attributing them to a fallback identity the app
+  supplies. Call it from a `post/` script — or avoid it entirely by pre-setting
+  a sentinel actor for the bootstrap.
 - **End-to-end test suite.** Applies the real shipped schema through
   schema-flow `imports` + `params` against a throwaway Postgres (docker
   compose), asserting both structure and audit/timestamp/soft-delete behavior.

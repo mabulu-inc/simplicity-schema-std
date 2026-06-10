@@ -1,0 +1,51 @@
+name: audit_backfill_by
+language: plpgsql
+returns: integer
+args:
+  - name: p_actor
+    type: bigint
+comment: |-
+  Fills NULL created_by / updated_by on every managed table carrying the
+  `audit` mixin, attributing them to p_actor. Returns the number of rows
+  fixed.
+
+  For bootstrap: rows seeded during a schema-flow run land with NULL *_by
+  (no actor set), which the post-seed NOT NULL tighten phase would reject.
+  Call this from a `post/` script — which runs before tighten — passing a
+  seeded fallback identity, e.g.
+    SELECT audit_backfill_by((SELECT user_id FROM users WHERE name = 'system'));
+
+  p_actor is supplied by the app (the package can't know how to resolve a
+  fallback identity); the loop is keyed on the audit mixin's created_by
+  column, scoped to the current schema.
+body: |-
+  DECLARE
+    t text;
+    n int := 0;
+    c int;
+  BEGIN
+    -- Stamp the fallback actor first so the UPDATE's audit_stamp trigger
+    -- stamps updated_by to it rather than re-NULLing it; created_by is
+    -- preserved by COALESCE (the trigger only sets updated_* on UPDATE).
+    PERFORM set_config('{{actor_guc}}', p_actor::text, true);
+
+    FOR t IN
+      SELECT table_name
+      FROM information_schema.columns
+      WHERE table_schema = current_schema() AND column_name = 'created_by'
+    LOOP
+      EXECUTE format(
+        'UPDATE %I
+            SET created_by = COALESCE(created_by, $1),
+                updated_by = COALESCE(updated_by, $1)
+          WHERE created_by IS NULL OR updated_by IS NULL',
+        t
+      ) USING p_actor;
+      GET DIAGNOSTICS c = ROW_COUNT;
+      n := n + c;
+    END LOOP;
+
+    RETURN n;
+  END;
+security: invoker
+volatility: volatile

@@ -26,7 +26,8 @@ model (including `@smplcty/auth`, which consumes this like any other app).
   - `audit_log_actor` — internal: supplies the parameterized `changed_by` FK
     for the `audit_log` table (application tables don't use it).
 - **Functions** — `audit_stamp`, `audit_diff`, `audit_skip_noop`,
-  `timestamps_stamp`.
+  `timestamps_stamp`, and `audit_backfill_by(p_actor)` (a bootstrap helper —
+  see below).
 - **Table** — `audit_log` (append-only field-level history).
 - **Parameters** — `user_table` / `user_pk` (the FK target for
   `created_by` / `updated_by` and `audit_log.changed_by`) and `actor_guc`
@@ -51,10 +52,37 @@ The consuming app supplies the identity table named by `user_table` (default
 `users`, with a `user_pk` primary key) and sets the `actor_guc` GUC per request
 — e.g. `SET LOCAL "app.actor_id" = '<user_id>'`. With no actor set, `audit_stamp`
 leaves `created_by` / `updated_by` NULL and `audit_diff` writes no history row;
-in production the `NOT NULL` `_by` columns reject such a write. During bootstrap
-those columns are still nullable (schema-flow tightens `NOT NULL` only after
-seeds), so seeded rows land with NULL `_by` and a backfill post-script fills
-them before the tighten phase.
+in production the `NOT NULL` `_by` columns reject such a write, and the app's
+session layer rejects an unauthenticated request long before it reaches the DB.
+
+### Seeding audit tables at bootstrap
+
+Rows seeded **during a schema-flow run** have no actor set, so their `_by`
+columns land NULL. Those columns are still nullable at seed time — schema-flow
+enforces `NOT NULL` only in a tighten phase that runs after seeds — but that
+tighten will then fail on the NULLs unless you resolve them first. Two ways:
+
+1. **Pre-set a sentinel actor (simplest).** Seed a fixed-id system identity in a
+   `pre/` script, then set the actor for the whole bootstrap via schema-flow's
+   `bootstrapSession: { 'app.actor_id': '<id>' }`. Seeds stamp the sentinel — no
+   NULLs, nothing to back-fill.
+
+2. **Back-fill before tighten.** Let seeds land with NULL `_by`, then call the
+   shipped `audit_backfill_by(p_actor)` from a `post/` script (post-scripts run
+   before tighten). It fills NULL `created_by` / `updated_by` on every
+   audit-mixin table in the schema, attributing them to `p_actor`, and returns
+   the row count:
+
+   ```sql
+   -- schema/post/0001-backfill-audit-by.sql
+   SELECT audit_backfill_by((SELECT user_id FROM users WHERE name = 'system'));
+   ```
+
+   Use this when the sentinel's id isn't known or fixed ahead of time. You
+   supply the fallback identity lookup; the package owns the back-fill itself.
+
+If you don't seed audit tables at bootstrap — all writes go through the app with
+the actor set — you need neither.
 
 ## Tests
 
