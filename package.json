@@ -34,6 +34,8 @@
     "node": ">=20"
   },
   "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
     "format": "prettier --check .",
     "format:fix": "prettier --write .",
     "prepare": "husky",
@@ -43,15 +45,25 @@
     "release:major": "GITHUB_TOKEN=$(gh auth token) release-it major"
   },
   "lint-staged": {
+    "*.{ts,js}": [
+      "prettier --write"
+    ],
     "*.{json,md,yaml,yml}": [
       "prettier --write"
     ]
   },
   "devDependencies": {
     "@release-it/keep-a-changelog": "^7.1.0",
+    "@smplcty/schema-flow": "^0.11.0",
+    "@types/node": "^25.5.0",
+    "@types/pg": "^8.20.0",
+    "dotenv": "^17.3.1",
     "husky": "^9.1.7",
     "lint-staged": "^16.4.0",
+    "pg": "^8.20.0",
     "prettier": "^3.8.1",
-    "release-it": "^20.2.0"
+    "release-it": "^20.2.0",
+    "typescript": "^6.0.2",
+    "vitest": "^4.1.1"
   }
 }

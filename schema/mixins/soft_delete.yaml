@@ -1,0 +1,14 @@
+mixin: soft_delete
+comment: |-
+  Adds a `deleted_at` nullable timestamp for soft-delete. App-layer
+  reads add `WHERE deleted_at IS NULL` to exclude archived rows by
+  default; an explicit opt-in (e.g. ?include_archived=true) bypasses
+  the filter. RLS policies are unchanged — soft-delete is a visibility
+  concern, not an authorization one. Unique indexes that must permit
+  reuse of a value after archive should use `where: "deleted_at IS NULL"`.
+
+  No parameters — `deleted_at` references nothing app-specific.
+columns:
+  - name: deleted_at
+    type: timestamptz
+    nullable: true

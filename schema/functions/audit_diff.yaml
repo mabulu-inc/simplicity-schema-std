@@ -1,0 +1,75 @@
+name: audit_diff
+language: plpgsql
+returns: trigger
+comment: |-
+  AFTER INSERT/UPDATE/DELETE trigger for the `audit_log` mixin. Writes
+  field-level change history to the audit_log table, reading the actor id
+  from the actor GUC ({{actor_guc}}). When the actor is unset it skips the
+  write — bootstrap activity is not audit-worthy, and audit_log.changed_by
+  is NOT NULL, so there is no actor to record.
+body: |-
+  DECLARE
+    pk_col      text;
+    pk_val      text;
+    old_row     jsonb;
+    new_row     jsonb;
+    col         text;
+    old_val     text;
+    new_val     text;
+    actor       bigint := NULLIF(current_setting('{{actor_guc}}', true), '')::bigint;
+    skip_cols   text[] := ARRAY['created_at','created_by','updated_at','updated_by','deleted_at'];
+  BEGIN
+    -- No actor (the bootstrap window) -> no history row. changed_by is
+    -- NOT NULL and bootstrap activity is not audit-worthy.
+    IF actor IS NULL THEN
+      RETURN COALESCE(NEW, OLD);
+    END IF;
+
+    SELECT a.attname INTO pk_col
+    FROM pg_index i
+    JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey)
+    WHERE i.indrelid = TG_RELID AND i.indisprimary
+    LIMIT 1;
+
+    IF TG_OP = 'INSERT' THEN
+      EXECUTE format('SELECT ($1).%I::text', pk_col) INTO pk_val USING NEW;
+      INSERT INTO audit_log (entity_type, entity_id, field, previous_value, new_value, changed_by)
+      VALUES (TG_TABLE_NAME, pk_val, '__row__', NULL, 'created', actor);
+      RETURN NEW;
+    END IF;
+
+    IF TG_OP = 'DELETE' THEN
+      EXECUTE format('SELECT ($1).%I::text', pk_col) INTO pk_val USING OLD;
+      INSERT INTO audit_log (entity_type, entity_id, field, previous_value, new_value, changed_by)
+      VALUES (TG_TABLE_NAME, pk_val, '__row__', 'existed', 'hard-deleted', actor);
+      RETURN OLD;
+    END IF;
+
+    -- UPDATE
+    EXECUTE format('SELECT ($1).%I::text', pk_col) INTO pk_val USING NEW;
+    old_row := to_jsonb(OLD);
+    new_row := to_jsonb(NEW);
+
+    FOR col IN SELECT jsonb_object_keys(new_row) LOOP
+      IF col = ANY(skip_cols) THEN CONTINUE; END IF;
+      old_val := old_row->>col;
+      new_val := new_row->>col;
+      IF old_val IS DISTINCT FROM new_val THEN
+        INSERT INTO audit_log (entity_type, entity_id, field, previous_value, new_value, changed_by)
+        VALUES (TG_TABLE_NAME, pk_val, col, old_val, new_val, actor);
+      END IF;
+    END LOOP;
+
+    IF (old_row->>'deleted_at') IS NULL AND (new_row->>'deleted_at') IS NOT NULL THEN
+      INSERT INTO audit_log (entity_type, entity_id, field, previous_value, new_value, changed_by)
+      VALUES (TG_TABLE_NAME, pk_val, '__row__', 'active', 'archived', actor);
+    END IF;
+    IF (old_row->>'deleted_at') IS NOT NULL AND (new_row->>'deleted_at') IS NULL THEN
+      INSERT INTO audit_log (entity_type, entity_id, field, previous_value, new_value, changed_by)
+      VALUES (TG_TABLE_NAME, pk_val, '__row__', 'archived', 'restored', actor);
+    END IF;
+
+    RETURN NEW;
+  END;
+security: invoker
+volatility: volatile

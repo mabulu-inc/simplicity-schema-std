@@ -1,0 +1,27 @@
+mixin: audit_log
+params:
+  actor_guc: { default: app.actor_id }
+comment: |-
+  Attaches the audit_diff trigger to a table. Tables that include this
+  mixin get full field-level change history written to the audit_log table:
+    INSERT  -> one '__row__: created' marker
+    UPDATE  -> one row per changed column (skipping stamp columns)
+               plus a '__row__: archived/restored' marker on
+               deleted_at transitions
+    DELETE  -> one '__row__: hard-deleted' marker
+  Runs AFTER audit_stamp (20_ > 10_) so created_*/updated_* are already
+  populated when audit_diff fires.
+
+  Parameter `actor_guc` — the GUC audit_diff reads the actor id from;
+  defaults to `app.actor_id`. Include alongside the `audit` mixin, and
+  ship the `audit_log` table (this package) as the write target.
+triggers:
+  - name: 20_audit_log_diff
+    timing: AFTER
+    events:
+      - INSERT
+      - UPDATE
+      - DELETE
+    function: audit_diff
+    for_each: ROW
+    comment: Writes field-level change history to the audit_log table.

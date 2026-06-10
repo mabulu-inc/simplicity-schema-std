@@ -1,0 +1,17 @@
+name: audit_skip_noop
+language: plpgsql
+returns: trigger
+comment: |-
+  BEFORE UPDATE trigger for the `audit` mixin (00_, runs first). Cancels
+  no-op UPDATEs (NEW IS NOT DISTINCT FROM OLD) so they don't generate an
+  MVCC tuple, bump updated_at, or produce spurious audit_log rows. No
+  parameters.
+body: >-
+  BEGIN
+    IF TG_OP = 'UPDATE' AND NEW IS NOT DISTINCT FROM OLD THEN
+      RETURN NULL;
+    END IF;
+    RETURN NEW;
+  END;
+security: invoker
+volatility: volatile

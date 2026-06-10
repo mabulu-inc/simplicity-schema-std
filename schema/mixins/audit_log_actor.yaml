@@ -1,0 +1,20 @@
+mixin: audit_log_actor
+params:
+  user_table: { default: users }
+  user_pk: { default: user_id }
+comment: |-
+  The `changed_by` actor FK for the `audit_log` table, parameterized to the
+  app's identity table. `user_table` / `user_pk` mirror the `audit` mixin's,
+  so one `imports[].params` override repoints created_by / updated_by and
+  audit_log.changed_by at the same identity table.
+
+  Used only by the audit_log table; application tables use `audit`.
+columns:
+  - name: changed_by
+    type: bigint
+    nullable: false
+    references:
+      table: '{{user_table}}'
+      column: '{{user_pk}}'
+      on_delete: RESTRICT
+      on_update: CASCADE

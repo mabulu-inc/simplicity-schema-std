@@ -1,0 +1,64 @@
+mixin: audit
+params:
+  user_table: { default: users }
+  user_pk: { default: user_id }
+  actor_guc: { default: app.actor_id }
+comment: |-
+  Adds the four stamp columns (created_at / updated_at / created_by /
+  updated_by) and the trigger pair that maintains them. Tables that carry
+  change-attribution include this mixin and do not redeclare the columns.
+
+  Trigger ordering: 00_ runs first (cancel no-op UPDATEs), then 10_
+  (stamp from the actor GUC); triggers fire in name order.
+
+  Parameters:
+    user_table / user_pk — the identity table the actor columns FK to.
+    actor_guc            — the GUC `audit_stamp` reads the actor id from.
+  All default to the convention (`users` / `user_id` / `app.actor_id`),
+  so the common case is param-free; a consuming app overrides them via
+  `imports[].params`.
+
+  Pair with the `audit_log` mixin on tables whose change history should be
+  queryable; pair with `soft_delete` on tables that need archive semantics
+  rather than DELETE.
+columns:
+  - name: created_at
+    type: timestamptz
+    nullable: false
+  - name: updated_at
+    type: timestamptz
+    nullable: false
+  - name: created_by
+    type: bigint
+    nullable: false
+    references:
+      table: '{{user_table}}'
+      column: '{{user_pk}}'
+      on_delete: RESTRICT
+      on_update: CASCADE
+  - name: updated_by
+    type: bigint
+    nullable: false
+    references:
+      table: '{{user_table}}'
+      column: '{{user_pk}}'
+      on_delete: RESTRICT
+      on_update: CASCADE
+triggers:
+  - name: 00_audit_skip_noop
+    timing: BEFORE
+    events:
+      - UPDATE
+    function: audit_skip_noop
+    for_each: ROW
+    comment: Cancels no-op UPDATEs (NEW IS NOT DISTINCT FROM OLD) so they
+      don't generate an MVCC tuple or bump updated_at.
+  - name: 10_audit_stamp
+    timing: BEFORE
+    events:
+      - INSERT
+      - UPDATE
+    function: audit_stamp
+    for_each: ROW
+    comment: Stamps created_at / updated_at / created_by / updated_by from
+      the actor GUC (set per request by the app, or per-tx during bootstrap).

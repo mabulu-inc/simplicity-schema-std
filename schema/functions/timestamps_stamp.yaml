@@ -1,0 +1,19 @@
+name: timestamps_stamp
+language: plpgsql
+returns: trigger
+comment: |-
+  BEFORE INSERT/UPDATE trigger for the `timestamps` mixin. Stamps
+  created_at on INSERT and updated_at on every write, with no actor
+  attribution — the actor-free counterpart to audit_stamp. No parameters.
+body: >-
+  BEGIN
+    IF TG_OP = 'INSERT' THEN
+      NEW.created_at := CURRENT_TIMESTAMP;
+      NEW.updated_at := NEW.created_at;
+    ELSE
+      NEW.updated_at := CURRENT_TIMESTAMP;
+    END IF;
+    RETURN NEW;
+  END;
+security: invoker
+volatility: volatile

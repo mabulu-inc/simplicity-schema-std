@@ -1,0 +1,59 @@
+table: audit_log
+mixins:
+  - audit_log_actor
+comment: |-
+  Field-level change history for audited entities. Populated by the
+  `audit_log` mixin's trigger (audit_diff). The `changed_by` actor FK is
+  supplied by the `audit_log_actor` mixin so it can be parameterized to the
+  app's identity table (user_table / user_pk).
+
+  Does NOT carry the `audit` / `audit_log` mixins itself (no recursive
+  triggers); changed_by + changed_at are recorded inline by the inserting
+  trigger.
+
+  This package ships no grants on audit_log — role names are app-specific.
+  Append-only semantics (grant SELECT + INSERT, withhold UPDATE + DELETE so
+  history can't be rewritten) are recommended; add them in the consuming app
+  via `extend:` against this table.
+columns:
+  - name: audit_log_id
+    type: bigserial
+    primary_key: true
+    nullable: false
+  - name: entity_type
+    type: varchar(50)
+    nullable: false
+    comment: Table name of the audited entity (e.g. 'producers').
+  - name: entity_id
+    type: text
+    nullable: false
+    comment: |
+      PK of the audited row, stringified. Serial-int PKs are the common
+      case, but text PKs are supported too — audit_diff casts to text
+      regardless.
+  - name: field
+    type: varchar(50)
+    nullable: false
+    comment: |
+      Column name that changed. The sentinel '__row__' marks lifecycle
+      transitions (created / archived / restored / hard-deleted) where
+      there is no specific column diff.
+  - name: previous_value
+    type: text
+    nullable: true
+  - name: new_value
+    type: text
+    nullable: true
+  - name: changed_at
+    type: timestamptz
+    nullable: false
+    default: CURRENT_TIMESTAMP
+indexes:
+  - name: audit_log_entity_idx
+    columns:
+      - entity_type
+      - entity_id
+      - changed_at
+  - name: audit_log_changed_at_idx
+    columns:
+      - changed_at

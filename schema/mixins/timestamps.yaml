@@ -1,0 +1,30 @@
+mixin: timestamps
+comment: |-
+  Adds `created_at` / `updated_at` and the trigger that maintains them —
+  the actor-free subset of `audit`. Use on tables that want creation /
+  update times but carry no change-attribution (no `created_by` /
+  `updated_by`, so no dependency on an identity table).
+
+  Maintenance is trigger-based, not column defaults: a BEFORE trigger
+  fires anyway to keep `updated_at` fresh on UPDATE (a DEFAULT only fires
+  on INSERT), so `created_at` is stamped in the same trigger at no extra
+  cost — and can't be overridden by a client-supplied value. Both are set
+  to the same `CURRENT_TIMESTAMP` (transaction start) on INSERT.
+
+  No parameters. Pair with `audit` instead when you need actor columns.
+columns:
+  - name: created_at
+    type: timestamptz
+    nullable: false
+  - name: updated_at
+    type: timestamptz
+    nullable: false
+triggers:
+  - name: 10_timestamps_stamp
+    timing: BEFORE
+    events:
+      - INSERT
+      - UPDATE
+    function: timestamps_stamp
+    for_each: ROW
+    comment: Stamps created_at on INSERT and updated_at on every write.
