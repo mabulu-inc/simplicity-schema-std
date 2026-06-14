@@ -51,11 +51,11 @@ With this set, `audit_stamp` fills `created_by` / `updated_by`, and `audit_diff`
 writes history rows attributed to that actor.
 
 :::caution[No actor set]
-With no actor, `audit_stamp` leaves `created_by` / `updated_by` NULL and
-`audit_diff` writes no history row. In production the `NOT NULL` `_by` columns
-reject such a write, and the app's session layer rejects an unauthenticated
-request long before it reaches the DB. The one legitimate no-actor window is
-bootstrap — see [Bootstrap & seeding](/simplicity-schema-std/guides/bootstrap-seeding/).
+With no actor, `audit_stamp` **raises** a clear error naming the GUC and refuses
+the write (a forgotten session/service context is a wiring bug), and `audit_diff`
+writes no history row. The one legitimate no-actor window is bootstrap seeding —
+opt in with the `lenient_guc` GUC; see
+[Bootstrap & seeding](/simplicity-schema-std/guides/bootstrap-seeding/).
 :::
 
 ## What you get

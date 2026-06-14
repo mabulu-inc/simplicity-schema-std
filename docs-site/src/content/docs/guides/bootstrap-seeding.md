@@ -5,12 +5,15 @@ description: How to seed audit tables at bootstrap without tripping the NOT NULL
 
 In production, every write goes through the app with the actor GUC set, so
 `created_by` / `updated_by` are always populated. **Bootstrap is the one window
-where no actor is set** — rows seeded during a schema-flow run land with NULL
-`_by` columns.
+where no actor is set** — rows seeded during a schema-flow run would otherwise
+have no actor.
 
-Those columns are still nullable at seed time (schema-flow enforces `NOT NULL`
-only in a tighten phase that runs _after_ seeds), but that tighten will then fail
-on the NULLs unless you resolve them first. Two ways to handle it.
+Because [`audit_stamp`](/simplicity-schema-std/functions/audit-stamp/) **refuses
+actor-less writes** (it raises rather than silently landing a NULL `_by`), a seed
+transaction must either set an actor or opt into lenient mode. Then the `_by`
+columns land NULL — and since they're still nullable at seed time (schema-flow
+enforces `NOT NULL` only in a tighten phase that runs _after_ seeds) — you
+resolve the NULLs before tighten. Two ways to handle it.
 
 ## Option 1 — Pre-set a sentinel actor (simplest)
 
@@ -23,12 +26,22 @@ bootstrapSession:
   app.actor_id: '1' # the seeded system identity's id
 ```
 
-Seeds stamp the sentinel — no NULLs, nothing to back-fill. Use this when you can
-fix the system identity's id ahead of time.
+Seeds stamp the sentinel — the actor is set, so nothing raises and there are no
+NULLs to back-fill. Use this when you can fix the system identity's id ahead of
+time.
 
 ## Option 2 — Back-fill before tighten
 
-Let seeds land with NULL `_by`, then call the shipped
+Run the bootstrap in **lenient mode** so actor-less seeds land NULL instead of
+raising, then back-fill. Set the lenient GUC via `bootstrapSession`:
+
+```yaml
+# schema-flow config
+bootstrapSession:
+  app.audit_lenient: 'true'
+```
+
+Then call the shipped
 [`audit_backfill_by(p_actor)`](/simplicity-schema-std/functions/audit-backfill-by/)
 from a `post/` script (post-scripts run **before** tighten). It fills NULL
 `created_by` / `updated_by` on every audit-mixin table in the schema, attributes

@@ -11,11 +11,12 @@ columns.
 
 ## Parameters
 
-| Parameter    | Default        | Purpose                                   |
-| ------------ | -------------- | ----------------------------------------- |
-| `user_table` | `users`        | identity table the actor columns FK to    |
-| `user_pk`    | `user_id`      | primary-key column of `user_table`        |
-| `actor_guc`  | `app.actor_id` | GUC `audit_stamp` reads the actor id from |
+| Parameter     | Default             | Purpose                                                                          |
+| ------------- | ------------------- | -------------------------------------------------------------------------------- |
+| `user_table`  | `users`             | identity table the actor columns FK to                                           |
+| `user_pk`     | `user_id`           | primary-key column of `user_table`                                               |
+| `actor_guc`   | `app.actor_id`      | GUC `audit_stamp` reads the actor id from                                        |
+| `lenient_guc` | `app.audit_lenient` | GUC that, when `'true'`, lets `audit_stamp` tolerate a missing actor (bootstrap) |
 
 All default to the convention, so the common case is param-free. See
 [Parameters](/simplicity-schema-std/getting-started/parameters/).
@@ -38,7 +39,8 @@ Triggers fire in name order, so the numeric prefixes set the sequence:
    `updated_at`. See [`audit_skip_noop`](/simplicity-schema-std/functions/audit-skip-noop/).
 2. **`10_audit_stamp`** (BEFORE INSERT/UPDATE) — stamps
    `created_at` / `updated_at` / `created_by` / `updated_by` from the actor GUC
-   (set per request by the app, or per-tx during bootstrap). See
+   (set per request by the app, or per-tx during bootstrap). **Raises** a clear
+   error if no actor is set, unless `lenient_guc` is `'true'`. See
    [`audit_stamp`](/simplicity-schema-std/functions/audit-stamp/).
 
 When paired with [`audit_log`](/simplicity-schema-std/mixins/audit-log/), that

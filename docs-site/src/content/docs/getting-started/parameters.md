@@ -1,18 +1,19 @@
 ---
 title: Parameters
-description: The three parameters — user_table, user_pk, actor_guc — and how to override them.
+description: The four parameters — user_table, user_pk, actor_guc, lenient_guc — and how to override them.
 ---
 
-The package is parameterized so it depends on no app's data model. Three
-parameters are supplied once, at import time, via `imports[].params`:
+The package is parameterized so it depends on no app's data model. Parameters
+are supplied once, at import time, via `imports[].params`:
 
-| Parameter    | Default        | What it controls                                                     |
-| ------------ | -------------- | -------------------------------------------------------------------- |
-| `user_table` | `users`        | FK target for `created_by` / `updated_by` and `audit_log.changed_by` |
-| `user_pk`    | `user_id`      | the primary-key column of `user_table` the FKs point at              |
-| `actor_guc`  | `app.actor_id` | the GUC the audit triggers read the actor id from                    |
+| Parameter     | Default             | What it controls                                                                                            |
+| ------------- | ------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `user_table`  | `users`             | FK target for `created_by` / `updated_by` and `audit_log.changed_by`                                        |
+| `user_pk`     | `user_id`           | the primary-key column of `user_table` the FKs point at                                                     |
+| `actor_guc`   | `app.actor_id`      | the GUC the audit triggers read the actor id from                                                           |
+| `lenient_guc` | `app.audit_lenient` | GUC that, when `'true'`, lets `audit_stamp` tolerate a missing actor (bootstrap seeding) instead of raising |
 
-All three default to the convention, so the common case is **param-free**:
+All four default to the convention, so the common case is **param-free**:
 
 ```yaml
 imports:
@@ -58,6 +59,14 @@ imports:
 
   ```sql
   NULLIF(current_setting('{{actor_guc}}', true), '')::bigint
+  ```
+
+- **`lenient_guc`** is interpolated into
+  [`audit_stamp`](/simplicity-schema-std/functions/audit-stamp/), which raises
+  unless this GUC is `'true'` when the actor is missing:
+
+  ```sql
+  current_setting('{{lenient_guc}}', true) IS DISTINCT FROM 'true'
   ```
 
 ## The actor type
