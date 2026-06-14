@@ -1,6 +1,6 @@
 {
   "name": "@smplcty/schema-std",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Standard, parameterized PostgreSQL schema building blocks (audit, soft-delete, timestamps) consumed via @smplcty/schema-flow imports.",
   "license": "MIT",
   "repository": {

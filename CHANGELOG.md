@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.2] - 2026-06-13
+
 ### Added
 
 - The documentation site now shows the released version as a badge in its
@@ -35,5 +37,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   schema-flow `imports` + `params` against a throwaway Postgres (docker
   compose), asserting both structure and audit/timestamp/soft-delete behavior.
 
-[Unreleased]: https://github.com/mabulu-inc/simplicity-schema-std/compare/v0.0.1...HEAD
+[Unreleased]: https://github.com/mabulu-inc/simplicity-schema-std/compare/v0.0.2...HEAD
+[0.0.2]: https://github.com/mabulu-inc/simplicity-schema-std/compare/v0.0.1...v0.0.2
 [0.0.1]: https://github.com/mabulu-inc/simplicity-schema-std/releases/tag/v0.0.1
