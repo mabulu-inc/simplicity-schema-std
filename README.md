@@ -31,9 +31,10 @@ model (including `@smplcty/auth`, which consumes this like any other app).
   see below).
 - **Table** — `audit_log` (append-only field-level history).
 - **Parameters** — `user_table` / `user_pk` (the FK target for
-  `created_by` / `updated_by` and `audit_log.changed_by`) and `actor_guc`
-  (the GUC the audit triggers stamp from), defaulting to
-  `users` / `user_id` / `app.actor_id`.
+  `created_by` / `updated_by` and `audit_log.changed_by`), `actor_guc`
+  (the GUC the audit triggers stamp from), and `lenient_guc` (when `'true'`,
+  `audit_stamp` tolerates a missing actor instead of raising — for bootstrap
+  seeding), defaulting to `users` / `user_id` / `app.actor_id` / `app.audit_lenient`.
 
 ## Usage
 
@@ -52,24 +53,30 @@ mixins: [audit, audit_log, soft_delete]
 The consuming app supplies the identity table named by `user_table` (default
 `users`, with a `user_pk` primary key) and sets the `actor_guc` GUC per request
 — e.g. `SET LOCAL "app.actor_id" = '<user_id>'`. With no actor set, `audit_stamp`
-leaves `created_by` / `updated_by` NULL and `audit_diff` writes no history row;
-in production the `NOT NULL` `_by` columns reject such a write, and the app's
-session layer rejects an unauthenticated request long before it reaches the DB.
+**raises** a clear error naming the GUC and refuses the write — a write to an
+audited table with no actor is a wiring bug (a code path that forgot to open a
+session / service context), and a named error beats a bare `NOT NULL` violation.
+The one legitimate actor-less case — bootstrap seeding — is opted into per
+transaction via the `lenient_guc` GUC (default `app.audit_lenient`), which makes
+`audit_stamp` leave `created_by` / `updated_by` NULL instead of raising; see below.
 
 ### Seeding audit tables at bootstrap
 
-Rows seeded **during a schema-flow run** have no actor set, so their `_by`
-columns land NULL. Those columns are still nullable at seed time — schema-flow
-enforces `NOT NULL` only in a tighten phase that runs after seeds — but that
-tighten will then fail on the NULLs unless you resolve them first. Two ways:
+Rows seeded **during a schema-flow run** have no actor set. Because `audit_stamp`
+refuses actor-less writes, the seed transactions must either set an actor or opt
+into lenient mode; their `_by` columns then land NULL, and since those columns are
+still nullable at seed time — schema-flow enforces `NOT NULL` only in a tighten
+phase that runs after seeds — you resolve the NULLs before tighten. Two ways:
 
 1. **Pre-set a sentinel actor (simplest).** Seed a fixed-id system identity in a
    `pre/` script, then set the actor for the whole bootstrap via schema-flow's
-   `bootstrapSession: { 'app.actor_id': '<id>' }`. Seeds stamp the sentinel — no
-   NULLs, nothing to back-fill.
+   `bootstrapSession: { 'app.actor_id': '<id>' }`. Seeds stamp the sentinel — the
+   actor is set, so nothing raises and there are no NULLs to back-fill.
 
-2. **Back-fill before tighten.** Let seeds land with NULL `_by`, then call the
-   shipped `audit_backfill_by(p_actor)` from a `post/` script (post-scripts run
+2. **Back-fill before tighten.** Run the bootstrap in lenient mode
+   (`bootstrapSession: { 'app.audit_lenient': 'true' }`) so actor-less seeds land
+   with NULL `_by` instead of raising, then call the shipped
+   `audit_backfill_by(p_actor)` from a `post/` script (post-scripts run
    before tighten). It fills NULL `created_by` / `updated_by` on every
    audit-mixin table in the schema, attributing them to `p_actor`, and returns
    the row count:

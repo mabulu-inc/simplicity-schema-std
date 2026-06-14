@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`lenient_guc` audit parameter** (default `app.audit_lenient`). When this GUC
+  is `'true'`, `audit_stamp` tolerates a missing actor and leaves
+  `created_by` / `updated_by` NULL instead of raising — the opt-in for bootstrap
+  seeding, where a back-fill resolves the NULLs before the `NOT NULL` tighten.
+
+### Changed
+
+- **`audit_stamp` now refuses actor-less writes with a clear, named error.** A
+  write to an audited table with no actor GUC set previously landed `created_by`
+  NULL and surfaced only as a bare `NOT NULL` violation (or silently, while the
+  columns were still nullable). It now raises `audit_stamp: <actor_guc> is not
+set; refusing to write to <schema>.<table>` with a hint, so a forgotten
+  session / service context fails loudly at the source. Bootstrap seeding opts
+  out via the new `lenient_guc` (run the seed transactions with
+  `bootstrapSession: { 'app.audit_lenient': 'true' }`).
+
 ## [0.0.2] - 2026-06-13
 
 ### Added

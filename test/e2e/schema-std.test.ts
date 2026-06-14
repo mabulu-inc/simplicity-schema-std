@@ -181,8 +181,11 @@ columns:
     await apply(ctx);
 
     await inSchema(ctx, async (q) => {
-      // Clear any actor leaked onto this pooled connection by an earlier test.
+      // Clear any actor leaked onto this pooled connection by an earlier test,
+      // and enter lenient mode so the actor-less seed lands NULL instead of
+      // raising — the bootstrap contract audit_backfill_by exists to resolve.
       await q(`RESET app.actor_id`);
+      await q(`SELECT set_config('app.audit_lenient', 'true', false)`);
 
       // Reproduce the pre-tighten bootstrap window: *_by columns still
       // nullable, and a row seeded with no actor set (audit_stamp writes NULL).
@@ -205,6 +208,41 @@ columns:
 
       // tighten can now re-enforce NOT NULL without VALIDATE failing
       await expect(q(`ALTER TABLE docs ALTER COLUMN created_by SET NOT NULL`)).resolves.toBeDefined();
+    });
+  });
+
+  it('(6) audit_stamp raises a clear error when the actor GUC is unset (strict default)', async () => {
+    ctx = await useTestProject(DATABASE_URL);
+    writeSchema(ctx.dir, { 'tables/users.yaml': usersTable, 'tables/docs.yaml': docsTable });
+
+    await apply(ctx);
+
+    await inSchema(ctx, async (q) => {
+      // No actor on this connection and lenient mode off: a write to an audited
+      // table must fail loudly (naming the GUC) rather than silently land NULL.
+      // Clear both GUCs in case an earlier test leaked them onto this pooled
+      // connection (set_config(..., false) is session-scoped).
+      await q(`SELECT set_config('app.actor_id', '', false)`);
+      await q(`SELECT set_config('app.audit_lenient', '', false)`);
+      await expect(q(`INSERT INTO docs (id, title) VALUES (1, 'x')`)).rejects.toThrow(/app\.actor_id is not set/);
+    });
+  });
+
+  it('(7) a lenient GUC lets actor-less writes through (bootstrap window)', async () => {
+    ctx = await useTestProject(DATABASE_URL);
+    writeSchema(ctx.dir, { 'tables/users.yaml': usersTable, 'tables/docs.yaml': docsTable });
+
+    await apply(ctx);
+
+    await inSchema(ctx, async (q) => {
+      // Bootstrap window: columns still nullable, lenient on, no actor — the
+      // seed lands with NULL _by (to be back-filled) instead of raising.
+      await q(`ALTER TABLE docs ALTER COLUMN created_by DROP NOT NULL`);
+      await q(`ALTER TABLE docs ALTER COLUMN updated_by DROP NOT NULL`);
+      await q(`SELECT set_config('app.actor_id', '', false)`);
+      await q(`SELECT set_config('app.audit_lenient', 'true', false)`);
+      await expect(q(`INSERT INTO docs (id, title) VALUES (1, 'seed')`)).resolves.toBeDefined();
+      expect((await q(`SELECT created_by FROM docs WHERE id = 1`)).rows[0].created_by).toBeNull();
     });
   });
 });

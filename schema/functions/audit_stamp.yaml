@@ -5,15 +5,24 @@ comment: |-
   BEFORE INSERT/UPDATE trigger for the `audit` mixin. Stamps created_at /
   updated_at / created_by / updated_by from the actor GUC ({{actor_guc}}).
 
-  When the actor is unset, created_by / updated_by are left NULL. That is
-  tolerated only in the bootstrap window, where schema-flow keeps the *_by
-  columns nullable until the post-seed tighten phase (a backfill fills them
-  first). In production the columns are NOT NULL, so a write with no actor
-  set is rejected by the constraint — the app sets {{actor_guc}} per request.
+  When the actor is unset it raises a clear error naming the GUC: a write to an
+  audited table with no actor is a wiring bug (a code path that forgot to open
+  a session / service context), and a named error beats a bare NOT NULL
+  violation. The one legitimate actor-less case is bootstrap seeding — set
+  {{lenient_guc}} = 'true' for those transactions and the trigger leaves _by
+  NULL instead (the *_by columns stay nullable until the post-seed tighten
+  phase, and a back-fill fills them first).
 body: >-
   DECLARE
     actor bigint := NULLIF(current_setting('{{actor_guc}}', true), '')::bigint;
   BEGIN
+    IF actor IS NULL
+       AND current_setting('{{lenient_guc}}', true) IS DISTINCT FROM 'true'
+    THEN
+      RAISE EXCEPTION 'audit_stamp: {{actor_guc}} is not set; refusing to write to %.%',
+        TG_TABLE_SCHEMA, TG_TABLE_NAME
+        USING HINT = 'Set {{actor_guc}} for the request (open a session / service context) before writing to an audited table; set {{lenient_guc}} = ''true'' only for bootstrap seeding.';
+    END IF;
     IF TG_OP = 'INSERT' THEN
       NEW.created_at := CURRENT_TIMESTAMP;
       NEW.created_by := actor;

@@ -3,6 +3,7 @@ params:
   user_table: { default: users }
   user_pk: { default: user_id }
   actor_guc: { default: app.actor_id }
+  lenient_guc: { default: app.audit_lenient }
 comment: |-
   Adds the four stamp columns (created_at / updated_at / created_by /
   updated_by) and the trigger pair that maintains them. Tables that carry
@@ -14,9 +15,12 @@ comment: |-
   Parameters:
     user_table / user_pk — the identity table the actor columns FK to.
     actor_guc            — the GUC `audit_stamp` reads the actor id from.
-  All default to the convention (`users` / `user_id` / `app.actor_id`),
-  so the common case is param-free; a consuming app overrides them via
-  `imports[].params`.
+    lenient_guc          — when this GUC is 'true', `audit_stamp` tolerates a
+                           missing actor (leaves _by NULL) instead of raising;
+                           used during bootstrap seeding before the back-fill.
+  All default to the convention (`users` / `user_id` / `app.actor_id` /
+  `app.audit_lenient`), so the common case is param-free; a consuming app
+  overrides them via `imports[].params`.
 
   Pair with the `audit_log` mixin on tables whose change history should be
   queryable; pair with `soft_delete` on tables that need archive semantics
