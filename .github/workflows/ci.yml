@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  # publish.yml calls this so nothing reaches npm without passing it.
+  workflow_call:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  # A newer push supersedes an older run; never cancel a release's gate.
+  cancel-in-progress: ${{ github.event_name != 'release' }}
+
+jobs:
+  check:
+    # The package ships only schema/ YAML, so there's no runtime Node code to
+    # test across versions; one current LTS is enough.
+    name: check (node 24)
+    runs-on: ubuntu-latest
+    env:
+      # The tests read this from a git-ignored .env locally; it matches the
+      # port docker-compose.yml publishes.
+      DATABASE_URL: postgresql://postgres:postgres@localhost:54330/postgres
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: pnpm/action-setup@v5
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm format
+
+      # The global setup starts PostgreSQL with `docker compose`, using the
+      # runner's Docker daemon, and applies the shipped schema through
+      # schema-flow imports.
+      - run: pnpm test
