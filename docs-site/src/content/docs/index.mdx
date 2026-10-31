@@ -22,13 +22,15 @@ import { Card, CardGrid } from '@astrojs/starlight/components';
 
 <CardGrid>
   <Card title="Imported, not copied" icon="seti:db">
-    Consumed by reference via schema-flow `imports`. Upgrade the package, every app gets the fix — no copy-pasted SQL to chase down.
+    Consumed by reference via schema-flow `imports`. Upgrade the package, every app gets the fix — no copy-pasted SQL to
+    chase down.
   </Card>
   <Card title="Parameterized" icon="setting">
     Each app supplies its own identity table and actor GUC. The package carries no dependency on any app's data model.
   </Card>
   <Card title="Audit built in" icon="approve-check">
-    Stamp columns, no-op skip, and a field-level `audit_log` trail — created/archived/restored/hard-deleted, one row per changed column.
+    Stamp columns, no-op skip, and a field-level `audit_log` trail — created/archived/restored/hard-deleted, one row per
+    changed column.
   </Card>
   <Card title="Composable" icon="puzzle">
     `audit`, `timestamps`, `soft_delete`, `audit_log` — mix the ones a table needs. Trigger ordering is handled for you.
