@@ -54,7 +54,7 @@
   },
   "devDependencies": {
     "@release-it/keep-a-changelog": "^8.0.1",
-    "@smplcty/schema-flow": "^0.24.0",
+    "@smplcty/schema-flow": "^0.26.0",
     "@types/node": "^26.6.6",
     "@types/pg": "^8.23.1",
     "dotenv": "^18.0.9",
