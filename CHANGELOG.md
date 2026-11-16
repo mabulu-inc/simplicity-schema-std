@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`audit_skip_noop_generated`, the no-op skip for a table with a stored
+  generated column.** PostgreSQL computes generated columns after `BEFORE`
+  triggers, so `NEW` holds `NULL` there and the `audit` mixin's
+  `00_audit_skip_noop` never sees such a row as unchanged: every identical
+  UPDATE went through, bumped `updated_at` and wrote a new row version. Declare
+  `01_audit_skip_noop_generated` on that table; it compares every other column
+  by its own type's equality. The mixin does not attach it for you, so a table
+  that gains a generated column must add it, and `audit_skip_noop` itself is
+  unchanged, so tables without one pay nothing extra.
+
 ## [0.1.0] - 2026-06-14
 
 ### Added

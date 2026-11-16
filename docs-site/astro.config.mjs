@@ -55,6 +55,7 @@ export default defineConfig({
             { label: 'audit_stamp', slug: 'functions/audit-stamp' },
             { label: 'audit_diff', slug: 'functions/audit-diff' },
             { label: 'audit_skip_noop', slug: 'functions/audit-skip-noop' },
+            { label: 'audit_skip_noop_generated', slug: 'functions/audit-skip-noop-generated' },
             { label: 'timestamps_stamp', slug: 'functions/timestamps-stamp' },
             { label: 'audit_backfill_by', slug: 'functions/audit-backfill-by' },
           ],

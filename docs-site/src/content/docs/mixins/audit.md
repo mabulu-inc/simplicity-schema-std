@@ -37,6 +37,9 @@ Triggers fire in name order, so the numeric prefixes set the sequence:
 1. **`00_audit_skip_noop`** (BEFORE UPDATE) — cancels no-op UPDATEs
    (`NEW IS NOT DISTINCT FROM OLD`) so they don't generate an MVCC tuple or bump
    `updated_at`. See [`audit_skip_noop`](/simplicity-schema-std/functions/audit-skip-noop/).
+   On a table with a stored generated column this comparison never matches; declare
+   [`01_audit_skip_noop_generated`](/simplicity-schema-std/functions/audit-skip-noop-generated/)
+   on that table as well.
 2. **`10_audit_stamp`** (BEFORE INSERT/UPDATE) — stamps
    `created_at` / `updated_at` / `created_by` / `updated_by` from the actor GUC
    (set per request by the app, or per-tx during bootstrap). **Raises** a clear

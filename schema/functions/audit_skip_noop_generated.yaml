@@ -1,0 +1,29 @@
+name: audit_skip_noop_generated
+language: plpgsql
+returns: trigger
+comment: |-
+  BEFORE UPDATE trigger for an `audit` table with a STORED generated column.
+  PostgreSQL computes generated columns after BEFORE triggers, so NEW holds
+  NULL there and `audit_skip_noop` never sees such a row as unchanged.
+  Declare it on the table as `01_audit_skip_noop_generated` (after 00_,
+  before 10_audit_stamp); it cancels the UPDATE when NEW equals OLD in every
+  column but the generated ones, compared by each column's own equality.
+  No parameters.
+body: >-
+  DECLARE
+    old_row jsonb := pg_catalog.to_jsonb(OLD);
+    kept jsonb;
+  BEGIN
+    IF TG_OP <> 'UPDATE' THEN
+      RETURN NEW;
+    END IF;
+    SELECT pg_catalog.jsonb_object_agg(a.attname, old_row -> a.attname::text) INTO kept
+      FROM pg_catalog.pg_attribute a
+     WHERE a.attrelid = TG_RELID AND a.attgenerated = 's' AND NOT a.attisdropped;
+    IF kept IS NOT NULL AND pg_catalog.jsonb_populate_record(NEW, kept) IS NOT DISTINCT FROM OLD THEN
+      RETURN NULL;
+    END IF;
+    RETURN NEW;
+  END;
+security: invoker
+volatility: volatile

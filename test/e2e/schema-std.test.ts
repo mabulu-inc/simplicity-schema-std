@@ -62,7 +62,13 @@ describe('E2E: @smplcty/schema-std', () => {
     expect(await fkTarget(ctx, 'audit_log', 'changed_by')).toBe('users');
 
     // the audit functions exist
-    for (const fn of ['audit_stamp', 'audit_diff', 'audit_skip_noop', 'timestamps_stamp']) {
+    for (const fn of [
+      'audit_stamp',
+      'audit_diff',
+      'audit_skip_noop',
+      'audit_skip_noop_generated',
+      'timestamps_stamp',
+    ]) {
       expect(await functionBody(ctx, fn)).not.toBe('');
     }
 
@@ -171,6 +177,63 @@ columns:
         `SELECT new_value FROM audit_log WHERE entity_id = '1' AND field = '__row__' AND new_value = 'archived'`,
       );
       expect(archived.rowCount).toBe(1);
+    });
+  });
+
+  it('(4b) audit_skip_noop_generated cancels no-op UPDATEs on a table with a stored generated column', async () => {
+    ctx = await useTestProject(DATABASE_URL);
+    writeSchema(ctx.dir, {
+      'tables/users.yaml': usersTable,
+      'tables/sheets.yaml': `
+table: sheets
+mixins: [audit]
+columns:
+  - name: id
+    type: bigint
+    primary_key: true
+  - name: title
+    type: text
+  - name: ratio
+    type: double precision
+  - name: title_length
+    type: integer
+    generated: length(title)
+  - name: half_ratio
+    type: double precision
+    generated: ratio / 3
+triggers:
+  - name: 01_audit_skip_noop_generated
+    timing: BEFORE
+    events: [UPDATE]
+    function: audit_skip_noop_generated
+    for_each: ROW
+`,
+    });
+
+    await apply(ctx);
+
+    await inSchema(ctx, async (q) => {
+      await q(`INSERT INTO users (user_id) VALUES (1)`);
+      await q(`SELECT set_config('app.actor_id', '1', false)`);
+      await q(`INSERT INTO sheets (id, title, ratio) VALUES (1, 'first', 0.3)`);
+      const stamp = async (): Promise<string> =>
+        (await q(`SELECT updated_at::text AS t FROM sheets WHERE id = 1`)).rows[0].t;
+
+      const before = await stamp();
+      expect((await q(`UPDATE sheets SET title = 'first' WHERE id = 1`)).rowCount).toBe(0);
+      expect(await stamp()).toBe(before);
+
+      expect((await q(`UPDATE sheets SET title = 'second' WHERE id = 1`)).rowCount).toBe(1);
+      expect((await q(`SELECT title_length FROM sheets WHERE id = 1`)).rows[0].title_length).toBe(6);
+
+      expect((await q(`UPDATE sheets SET title = NULL WHERE id = 1`)).rowCount).toBe(1);
+
+      // A float that prints the same at low precision is still a change.
+      await q(`SET extra_float_digits = 0`);
+      expect((await q(`UPDATE sheets SET ratio = 0.30000000000000004 WHERE id = 1`)).rowCount).toBe(1);
+      // A generated value that does not round-trip lets the update through rather than skipping it.
+      expect((await q(`UPDATE sheets SET ratio = ratio WHERE id = 1`)).rowCount).toBe(1);
+      await q(`RESET extra_float_digits`);
     });
   });
 

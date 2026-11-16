@@ -27,6 +27,13 @@ entirely. Because it carries the `00_` prefix it fires before
 [`audit_stamp`](/simplicity-schema-std/functions/audit-stamp/) (`10_`), so an
 unchanged row never even reaches the stamping logic.
 
+:::caution[Stored generated columns]
+PostgreSQL computes stored generated columns after `BEFORE` triggers, so they are
+`NULL` in `NEW` and this comparison never matches on such a table. Add
+[`audit_skip_noop_generated`](/simplicity-schema-std/functions/audit-skip-noop-generated/)
+to that table.
+:::
+
 :::note[Why it matters]
 Without this, an `UPDATE` that sets every column to its current value would still
 write a new row version, refresh `updated_at`, and — on a table with

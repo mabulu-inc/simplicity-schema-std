@@ -27,6 +27,7 @@ model (including `@smplcty/auth`, which consumes this like any other app).
   - `audit_log_actor` — internal: supplies the parameterized `changed_by` FK
     for the `audit_log` table (application tables don't use it).
 - **Functions** — `audit_stamp`, `audit_diff`, `audit_skip_noop`,
+  `audit_skip_noop_generated` (for a table with a stored generated column),
   `timestamps_stamp`, and `audit_backfill_by(p_actor)` (a bootstrap helper —
   see below).
 - **Table** — `audit_log` (append-only field-level history).
